@@ -229,11 +229,24 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: [windows, android, macos]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
+      - name: 确定 Release 标签
+        id: release-tag
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+            echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -244,6 +257,7 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release-tag.outputs.tag }}
           files: artifacts/*
           generate_release_notes: true
           fail_on_unmatched_files: true
